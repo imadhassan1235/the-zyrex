@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -12,4 +6,978 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum LeadSource {
+  CONTACT
+  GET_QUOTE
+  AI_ASSISTANT
+  BOOKING
+  COURSE_ENROLLMENT
+  WHATSAPP
+  MANUAL
+  WEBSITE
+  OTHER
+}
+
+enum LeadType {
+  BUSINESS
+  ACADEMY
+  GENERAL
+}
+
+enum ActivityType {
+  NOTE
+  ASSIGNMENT
+  STATUS_CHANGE
+  FOLLOW_UP
+  EMAIL
+  CALL
+  WHATSAPP
+  MEETING
+  OTHER
+}
+
+enum ServiceStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProjectStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TestimonialStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseMode {
+  ONLINE
+  ONSITE
+  HYBRID
+}
+
+enum EnrollmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentPurpose {
+  COURSE_ENROLLMENT
+  SERVICE
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum InternshipStatus {
+  PENDING
+  ELIGIBLE
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  NEW
+  REVIEWING
+  SHORTLISTED
+  INTERVIEW
+  SELECTED
+  REJECTED
+}
+
+enum AIIntent {
+  BUSINESS
+  STUDENT
+  GENERAL_INFORMATION
+  CONTACT
+  QUOTE
+  BOOKING
+}
+
+enum AIMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum NotificationType {
+  LEAD
+  QUOTE
+  APPOINTMENT
+  ENROLLMENT
+  PAYMENT
+  CAREER
+  AI
+  SYSTEM
+}
+
+// ============================================================
+// AUTH / RBAC
+// ============================================================
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  name         String
+  email        String     @unique
+  passwordHash String
+  phone        String?
+  status       UserStatus @default(ACTIVE)
+
+  roleId String @db.Uuid
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  assignedLeads      Lead[]             @relation("LeadAssignee")
+  assignedActivities LeadActivity[]     @relation("ActivityCreator")
+  appointments       Appointment[]      @relation("AppointmentAssignee")
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  articles           Article[]          @relation("ArticleAuthor")
+  coursesTaught      CourseInstructor[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roleId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  description String?
+  users       User[]
+  permissions RolePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique
+  description String?
+
+  roles RolePermission[]
+
+  createdAt DateTime @default(now())
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action       String
+  resourceType String
+  resourceId   String?
+  oldValues    Json?
+  newValues    Json?
+  ipAddress    String?
+  sessionId    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// CRM
+// ============================================================
+
+model Company {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String
+  website     String?
+  email       String?
+  phone       String?
+  industryId  String? @db.Uuid
+  description String?
+
+  industry Industry? @relation(fields: [industryId], references: [id], onDelete: SetNull)
+
+  leads    Lead[]
+  contacts Contact[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([industryId])
+  @@index([name])
+}
+
+model Contact {
+  id        String  @id @default(uuid()) @db.Uuid
+  name      String
+  email     String?
+  phone     String?
+  whatsapp  String?
+  position  String?
+  companyId String? @db.Uuid
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  leadId String? @unique @db.Uuid
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([email])
+}
+
+model Lead {
+  id String @id @default(uuid()) @db.Uuid
+
+  name      String
+  email     String?
+  phone     String?
+  whatsapp  String?
+  companyId String? @db.Uuid
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  source   LeadSource   @default(WEBSITE)
+  leadType LeadType     @default(BUSINESS)
+  status   LeadStatus   @default(NEW)
+  priority LeadPriority @default(MEDIUM)
+
+  industryId String?   @db.Uuid
+  industry   Industry? @relation(fields: [industryId], references: [id], onDelete: SetNull)
+
+  interestedServiceId String?  @db.Uuid
+  interestedService   Service? @relation(fields: [interestedServiceId], references: [id], onDelete: SetNull)
+
+  assignedToId String? @db.Uuid
+  assignedTo   User?   @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  requirement String?
+  budget      Decimal? @db.Decimal(12, 2)
+  timeline    String?
+  notes       String?
+
+  contact Contact?
+
+  activities      LeadActivity[]
+  followUps       FollowUp[]
+  quoteRequest    QuoteRequest?
+  contactSubmit   ContactSubmission?
+  appointments    Appointment[]
+  enrollments     Enrollment[]
+  aiConversations AIConversation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([source])
+  @@index([leadType])
+  @@index([priority])
+  @@index([assignedToId])
+  @@index([industryId])
+  @@index([interestedServiceId])
+  @@index([createdAt])
+}
+
+model LeadActivity {
+  id String @id @default(uuid()) @db.Uuid
+
+  leadId String @db.Uuid
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  userId String? @db.Uuid
+  user   User?   @relation("ActivityCreator", fields: [userId], references: [id], onDelete: SetNull)
+
+  type        ActivityType
+  title       String?
+  description String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model FollowUp {
+  id String @id @default(uuid()) @db.Uuid
+
+  leadId String @db.Uuid
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  scheduledAt DateTime
+  completedAt DateTime?
+  note        String?
+  completed   Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([scheduledAt])
+  @@index([completed])
+}
+
+model QuoteRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  leadId String @unique @db.Uuid
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  serviceId String?  @db.Uuid
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  projectDescription String?
+  budget             Decimal? @db.Decimal(12, 2)
+  timeline           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceId])
+}
+
+model ContactSubmission {
+  id String @id @default(uuid()) @db.Uuid
+
+  leadId String @unique @db.Uuid
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  serviceId String?  @db.Uuid
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceId])
+}
+
+// ============================================================
+// SERVICES / INDUSTRIES / TECHNOLOGIES
+// ============================================================
+
+model Service {
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String        @unique
+  slug             String        @unique
+  shortDescription String?
+  description      String?
+  icon             String?
+  imageUrl         String?
+  status           ServiceStatus @default(DRAFT)
+  featured         Boolean       @default(false)
+
+  seoTitle       String?
+  seoDescription String?
+  canonicalUrl   String?
+  ogImageUrl     String?
+
+  industries IndustryService[]
+  leads      Lead[]
+  quotes     QuoteRequest[]
+  contacts   ContactSubmission[]
+  portfolios PortfolioProjectService[]
+  courses    Course[]
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  testimonials      Testimonial[]
+  appointments      Appointment[]
+  airecommendations AIRecommendation[]
+
+  @@index([status])
+  @@index([featured])
+}
+
+model Industry {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  imageUrl    String?
+
+  services   IndustryService[]
+  companies  Company[]
+  leads      Lead[]
+  portfolios PortfolioProjectIndustry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model IndustryService {
+  industryId String @db.Uuid
+  serviceId  String @db.Uuid
+
+  industry Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([industryId, serviceId])
+  @@index([serviceId])
+}
+
+model Technology {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  iconUrl     String?
+
+  portfolios PortfolioProjectTechnology[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================================
+// PORTFOLIO
+// ============================================================
+
+model PortfolioProject {
+  id               String        @id @default(uuid()) @db.Uuid
+  title            String
+  slug             String        @unique
+  description      String?
+  shortDescription String?
+  imageUrl         String?
+  projectUrl       String?
+  clientName       String?
+  status           ProjectStatus @default(DRAFT)
+  featured         Boolean       @default(false)
+
+  seoTitle       String?
+  seoDescription String?
+  canonicalUrl   String?
+  ogImageUrl     String?
+
+  services     PortfolioProjectService[]
+  industries   PortfolioProjectIndustry[]
+  technologies PortfolioProjectTechnology[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([featured])
+}
+
+model PortfolioProjectService {
+  projectId String @db.Uuid
+  serviceId String @db.Uuid
+
+  project PortfolioProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  service Service          @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, serviceId])
+  @@index([serviceId])
+}
+
+model PortfolioProjectIndustry {
+  projectId  String @db.Uuid
+  industryId String @db.Uuid
+
+  project  PortfolioProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  industry Industry         @relation(fields: [industryId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, industryId])
+  @@index([industryId])
+}
+
+model PortfolioProjectTechnology {
+  projectId    String @db.Uuid
+  technologyId String @db.Uuid
+
+  project    PortfolioProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  technology Technology       @relation(fields: [technologyId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, technologyId])
+  @@index([technologyId])
+}
+
+// ============================================================
+// TESTIMONIALS
+// ============================================================
+
+model Testimonial {
+  id          String            @id @default(uuid()) @db.Uuid
+  clientName  String
+  companyName String?
+  position    String?
+  testimonial String
+  photoUrl    String?
+  serviceId   String?           @db.Uuid
+  service     Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  status      TestimonialStatus @default(DRAFT)
+  featured    Boolean           @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([serviceId])
+  @@index([status])
+  @@index([featured])
+}
+
+// ============================================================
+// ACADEMY
+// ============================================================
+
+model Course {
+  id                   String       @id @default(uuid()) @db.Uuid
+  name                 String
+  slug                 String       @unique
+  shortDescription     String?
+  description          String?
+  category             String?
+  duration             String?
+  mode                 CourseMode   @default(ONLINE)
+  fee                  Decimal?     @db.Decimal(12, 2)
+  requirements         String?
+  curriculum           Json?
+  projects             Json?
+  certificateAvailable Boolean      @default(false)
+  internshipAvailable  Boolean      @default(false)
+  careerSupport        Boolean      @default(false)
+  status               CourseStatus @default(DRAFT)
+  featured             Boolean      @default(false)
+  imageUrl             String?
+
+  serviceId String?  @db.Uuid
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  seoTitle       String?
+  seoDescription String?
+  canonicalUrl   String?
+  ogImageUrl     String?
+
+  instructors CourseInstructor[]
+  enrollments Enrollment[]
+  internships Internship[]
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  airecommendations AIRecommendation[]
+
+  @@index([status])
+  @@index([featured])
+  @@index([serviceId])
+}
+
+model CourseInstructor {
+  courseId String @db.Uuid
+  userId   String @db.Uuid
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, userId])
+  @@index([userId])
+}
+
+model Student {
+  id         String  @id @default(uuid()) @db.Uuid
+  fullName   String
+  email      String  @unique
+  phone      String?
+  whatsapp   String?
+  education  String?
+  experience String?
+  location   String?
+  notes      String?
+
+  enrollments Enrollment[]
+  internships Internship[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model Enrollment {
+  id String @id @default(uuid()) @db.Uuid
+
+  studentId String  @db.Uuid
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  courseId String @db.Uuid
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  leadId String? @db.Uuid
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  mode     CourseMode
+  status   EnrollmentStatus @default(PENDING)
+  amount   Decimal?         @db.Decimal(12, 2)
+  currency String           @default("PKR")
+
+  additionalInfo String?
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([courseId])
+  @@index([leadId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Internship {
+  id String @id @default(uuid()) @db.Uuid
+
+  studentId String  @db.Uuid
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  courseId String? @db.Uuid
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  status    InternshipStatus @default(PENDING)
+  startDate DateTime?
+  endDate   DateTime?
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([courseId])
+  @@index([status])
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+
+  enrollmentId String?     @db.Uuid
+  enrollment   Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+
+  amount   Decimal @db.Decimal(12, 2)
+  currency String  @default("PKR")
+
+  purpose       PaymentPurpose
+  provider      String?
+  transactionId String?
+  status        PaymentStatus  @default(PENDING)
+  metadata      Json?
+
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([enrollmentId])
+  @@index([status])
+  @@index([purpose])
+  @@index([transactionId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// APPOINTMENTS / BOOKING
+// ============================================================
+
+model Appointment {
+  id String @id @default(uuid()) @db.Uuid
+
+  leadId String? @db.Uuid
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  name      String
+  email     String
+  phone     String?
+  serviceId String?  @db.Uuid
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  startAt  DateTime
+  endAt    DateTime
+  timezone String
+
+  assignedToId String? @db.Uuid
+  assignedTo   User?   @relation("AppointmentAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  status AppointmentStatus @default(PENDING)
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([serviceId])
+  @@index([assignedToId])
+  @@index([startAt])
+  @@index([endAt])
+  @@index([status])
+}
+
+// ============================================================
+// BLOG / INSIGHTS
+// ============================================================
+
+model ArticleCategory {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique
+  slug        String  @unique
+  description String?
+
+  articles Article[]
+
+  createdAt DateTime @default(now())
+}
+
+model Article {
+  id               String  @id @default(uuid()) @db.Uuid
+  title            String
+  slug             String  @unique
+  excerpt          String?
+  content          String
+  featuredImageUrl String?
+
+  authorId String @db.Uuid
+  author   User   @relation("ArticleAuthor", fields: [authorId], references: [id])
+
+  categoryId String?          @db.Uuid
+  category   ArticleCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  seoTitle       String?
+  seoDescription String?
+  canonicalUrl   String?
+  ogImageUrl     String?
+
+  publishedAt DateTime?
+  status      ContentStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([publishedAt])
+}
+
+// ============================================================
+// CAREERS
+// ============================================================
+
+model JobPosition {
+  id             String        @id @default(uuid()) @db.Uuid
+  title          String
+  slug           String        @unique
+  department     String?
+  location       String?
+  employmentType String?
+  description    String
+  requirements   Json?
+  status         ContentStatus @default(DRAFT)
+
+  applications CareerApplication[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model CareerApplication {
+  id String @id @default(uuid()) @db.Uuid
+
+  positionId String      @db.Uuid
+  position   JobPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  name         String
+  email        String
+  phone        String?
+  cvUrl        String?
+  portfolioUrl String?
+  coverMessage String?
+
+  status ApplicationStatus @default(NEW)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([positionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================
+// AI ASSISTANT
+// ============================================================
+
+model AIConversation {
+  id String @id @default(uuid()) @db.Uuid
+
+  sessionId String @unique
+
+  leadId String? @db.Uuid
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  intent AIIntent @default(GENERAL_INFORMATION)
+
+  messages        AIMessage[]
+  recommendations AIRecommendation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([intent])
+  @@index([createdAt])
+}
+
+model AIMessage {
+  id String @id @default(uuid()) @db.Uuid
+
+  conversationId String         @db.Uuid
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role     AIMessageRole
+  content  String
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model AIRecommendation {
+  id String @id @default(uuid()) @db.Uuid
+
+  conversationId String         @db.Uuid
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  serviceId String?  @db.Uuid
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  courseId String? @db.Uuid
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([serviceId])
+  @@index([courseId])
+}
+
+// ============================================================
+// SYSTEM
+// ============================================================
+
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type    NotificationType
+  title   String
+  message String
+  link    String?
+  read    Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model SiteSetting {
+  id    String @id @default(uuid()) @db.Uuid
+  key   String @unique
+  value Json
+
+  updatedAt DateTime @updatedAt
 }
