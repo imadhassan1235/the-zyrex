@@ -204,3 +204,88 @@ select {
   background: var(--primary);
   color: var(--on-primary);
 }
+
+/* Services page: light theme defaults */
+.services-page {
+  --services-bg: #fdf7ff;
+  --services-text: #1d1b20;
+  --services-muted: #625d69;
+  --services-border: rgba(29, 27, 32, 0.14);
+  --services-panel: rgba(255, 255, 255, 0.82);
+  --services-card: linear-gradient(135deg, #ffffff 0%, #f2ecf4 100%);
+  --services-grid-dot: rgba(29, 27, 32, 0.1);
+  --services-accent: #0369a1;
+  --services-pill: rgba(29, 27, 32, 0.05);
+
+  min-height: 100%;
+  overflow-x: hidden;
+  background-color: var(--services-bg);
+  color: var(--services-text);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+:root[data-theme="dark"] .services-page {
+  --services-bg: #07080b;
+  --services-text: #f1f5f9;
+  --services-muted: #a1a1aa;
+  --services-border: rgba(255, 255, 255, 0.08);
+  --services-panel: rgba(10, 13, 19, 0.82);
+  --services-card: linear-gradient(
+    135deg,
+    rgba(20, 24, 35, 0.72) 0%,
+    rgba(13, 16, 24, 0.88) 100%
+  );
+  --services-grid-dot: rgba(255, 255, 255, 0.07);
+  --services-accent: #38bdf8;
+  --services-pill: rgba(255, 255, 255, 0.05);
+}
+
+.services-page .bg-grid-pattern {
+  background-image: radial-gradient(
+    var(--services-grid-dot) 1px,
+    transparent 1px
+  );
+  background-size: 32px 32px;
+}
+
+.services-page .glass-card {
+  border: 1px solid var(--services-border);
+  background: var(--services-card);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.services-page .glass-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--services-accent);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.22);
+}
+
+.services-page .sp-heading {
+  color: var(--services-text);
+}
+
+.services-page .sp-muted {
+  color: var(--services-muted);
+}
+
+.services-page .sp-border {
+  border-color: var(--services-border);
+}
+
+.services-page .sp-panel {
+  background-color: var(--services-panel);
+}
+
+.services-page .sp-pill {
+  background-color: var(--services-pill);
+}
+
+.services-page .sp-accent {
+  color: var(--services-accent);
+}
+
+.services-page .nav-glow {
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.18);
+}

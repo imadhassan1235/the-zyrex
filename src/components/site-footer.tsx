@@ -30,7 +30,7 @@ export function SiteFooter() {
               className="h-16 w-auto object-contain"
             />
             <span className="mt-2 text-xs tracking-wide text-inverse-on-surface/60">
-              Learn. Earn. Grow.
+              Learn. Earn. Grow. 
             </span>
           </Link>
 
